@@ -25,7 +25,10 @@ foreach (var type in oneDbContext.ComponentTypes)
         templateContext.ComponentTypes.Add(new TTSTest.TemplateDB.ComponentType() { Type = type.Type });
         log.AppendLine($"DB1\tДобавлен тип компонента {type.Type}");
     }
-    log.AppendLine($"DB1\tТип компонента {type.Type} пропущен");
+    else
+    {
+        log.AppendLine($"DB1\tТип компонента {type.Type} пропущен");
+    }
 }
 
 //сохраняем айдишники компонентов в главной бд
