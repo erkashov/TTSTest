@@ -23,8 +23,9 @@ foreach (var type in oneDbContext.ComponentTypes)
     if (!templateContext.ComponentTypes.Any(p => p.Type == type.Type))
     {
         templateContext.ComponentTypes.Add(new TTSTest.TemplateDB.ComponentType() { Type = type.Type });
-
+        log.AppendLine($"DB1\tДобавлен тип компонента {type.Type}");
     }
+    log.AppendLine($"DB1\tТип компонента {type.Type} пропущен");
 }
 
 //сохраняем айдишники компонентов в главной бд
@@ -44,11 +45,13 @@ foreach (var component in oneDbContext.Components)
         templateContext.Components.Add(comp);
         templateContext.SaveChanges();
         newComponentsIds.Add(comp.Id, component.Id);
+        log.AppendLine($"DB1\tДобавлен компонент {comp.Name}");
     }
     else
     {
         //если компонент уже добавлен, просто сохраняем его айди
         newComponentsIds.Add(oldComp.Id, oldComp.Id);
+        log.AppendLine($"DB1\tКомпонент {component.Type} пропущен");
     }
 }
 
@@ -73,11 +76,13 @@ foreach (var recipe in oneDbContext.Recipes)
         templateContext.Recipes.Add(rec);
         templateContext.SaveChanges();
         newReceiptsIds.Add(rec.Id, recipe.Id);
+        log.AppendLine($"DB1\tДобавлен рецепт {recipe.Name}");
     }
     else
     {
         //если компонент уже добавлен, просто сохраняем его айди
         newReceiptsIds.Add(oldRecipe.Id, oldRecipe.Id);
+        log.AppendLine($"DB1\tРецепт {recipe.Name} пропущен");
     }
 }
 
@@ -103,6 +108,7 @@ foreach (var recipeStructure in oneDbContext.RecipeStructures)
         };
         templateContext.RecipeStructures.Add(recipeStr);
         templateContext.SaveChanges();
+        log.AppendLine($"DB1\tДобавлена структура компонента {recipeStructure.Recipe.Name}-{recipeStructure.Component.Name}");
     }
 }
 
@@ -128,10 +134,12 @@ foreach (var mixer in twoContext.MixerSets)
         templateContext.RecipeMixerSets.Add(mix);
         templateContext.SaveChanges();
         newMixersIds.Add(mixer.Id, mix.Id);
+        log.AppendLine($"DB2\tДобавлен mixer {mixer.Name}");
     }
     else
     {
         newMixersIds.Add(oldMixer.Id, oldMixer.Id);
+        log.AppendLine($"DB2\tMixer {mixer.Name} пропущен");
     }
 }
 
@@ -154,10 +162,12 @@ foreach (var timeSet in twoContext.TimeSets)
         templateContext.RecipeTimeSets.Add(time);
         templateContext.SaveChanges();
         newTimeSetsIds.Add(timeSet.Id, time.Id);
+        log.AppendLine($"DB2\tДобавлен timeSet {timeSet.Name}");
     }
     else
     {
         newTimeSetsIds.Add(oldMixer.Id, oldMixer.Id);
+        log.AppendLine($"DB2\tTimeSet {timeSet.Name} пропущен");
     }
 }
 
@@ -165,13 +175,22 @@ foreach (var timeSet in twoContext.TimeSets)
 
 foreach (var recipe in twoContext.Recipes)
 {
-    TTSTest.TemplateDB.Recipe rec = new TTSTest.TemplateDB.Recipe()
+    var oldRecipe = templateContext.Recipes.Where(p => p.Name == recipe.Name).FirstOrDefault();
+    if (oldRecipe == null)
     {
-        Name = recipe.Name,
-        DateModified = recipe.DateModified
-    };
-    if (recipe.TimeSetId.HasValue) rec.TimeSetId = newTimeSetsIds[recipe.TimeSetId.Value];
-    if (recipe.MixerSetId.HasValue) rec.MixerSetId = newMixersIds[recipe.MixerSetId.Value];
-    templateContext.Recipes.Add(rec);
-    templateContext.SaveChanges();
+        TTSTest.TemplateDB.Recipe rec = new TTSTest.TemplateDB.Recipe()
+        {
+            Name = recipe.Name,
+            DateModified = recipe.DateModified
+        };
+        if (recipe.TimeSetId.HasValue) rec.TimeSetId = newTimeSetsIds[recipe.TimeSetId.Value];
+        if (recipe.MixerSetId.HasValue) rec.MixerSetId = newMixersIds[recipe.MixerSetId.Value];
+        templateContext.Recipes.Add(rec);
+        templateContext.SaveChanges();
+        log.AppendLine($"DB2\tДобавлен рецепт {recipe.Name}");
+    }
+    else
+    {
+        log.AppendLine($"DB2\tРецепт {recipe.Name} пропущен");
+    }
 }
