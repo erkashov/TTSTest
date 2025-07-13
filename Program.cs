@@ -1,16 +1,44 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using TTSTest.OneDB;
 using TTSTest.TemplateDB;
 using TTSTest.TwoDB;
 
-var templateContext = new TemplateDbContext();
-var oneDbContext = new Db1Context();
-var twoContext = new Db2Context();
+var builder = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+
+var configuration = builder.Build();
+
+var services = new ServiceCollection();
+
+// Регистрируем конфигурацию
+services.AddDbContext<TemplateDbContext>(options =>
+    options.UseSqlServer(configuration.GetConnectionString("TemplateDBConnection")));
+
+services.AddDbContext<Db1Context>(options =>
+    options.UseSqlServer(configuration.GetConnectionString("DB1Connection")));
+
+services.AddDbContext<Db2Context>(options =>
+    options.UseSqlServer(configuration.GetConnectionString("DB2Connection")));
+
+var serviceProvider = services.BuildServiceProvider();
+
+// Получаем контексты из сервиса
+var templateContext = serviceProvider.GetRequiredService<TemplateDbContext>();
+var oneDbContext = serviceProvider.GetRequiredService<Db1Context>();
+var twoContext = serviceProvider.GetRequiredService<Db2Context>();
+
 
 templateContext.Database.EnsureCreated();
 oneDbContext.Database.EnsureCreated();
@@ -24,6 +52,7 @@ foreach (var type in oneDbContext.ComponentTypes)
     if (!templateContext.ComponentTypes.Any(p => p.Type == type.Type))
     {
         templateContext.ComponentTypes.Add(new TTSTest.TemplateDB.ComponentType() { Type = type.Type });
+        templateContext.SaveChanges();
         log.AppendLine($"DB1\tДобавлен тип компонента {type.Type}");
     }
     else
@@ -48,7 +77,7 @@ foreach (var component in oneDbContext.Components)
 
         templateContext.Components.Add(comp);
         templateContext.SaveChanges();
-        newComponentsIds.Add(comp.Id, component.Id);
+        newComponentsIds.Add(component.Id, comp.Id);
         log.AppendLine($"DB1\tДобавлен компонент {comp.Name}");
     }
     else
@@ -79,7 +108,7 @@ foreach (var recipe in oneDbContext.Recipes)
         rec.TimeSetId = templateContext.RecipeTimeSets.FirstOrDefault(p => p.MixTime == recipe.MixTime)?.Id;
         templateContext.Recipes.Add(rec);
         templateContext.SaveChanges();
-        newReceiptsIds.Add(rec.Id, recipe.Id);
+        newReceiptsIds.Add(recipe.Id, rec.Id);
         log.AppendLine($"DB1\tДобавлен рецепт {recipe.Name}");
     }
     else
@@ -102,7 +131,7 @@ foreach (var recipeStructure in oneDbContext.RecipeStructures)
     //1. обновлять amount
     //2. учитывать amount при проверке на уникальность, и просто добавляем с новым amount
 
-    if (!templateContext.RecipeStructures.Any(p => p.RecipeId == newReceiptsIds[recipeStructure.RecipeId] && p.ComponentId == newComponentsIds[recipeStructure.ComponentId]))
+    if (!templateContext.RecipeStructures.ToList().Any(p => p.RecipeId == newReceiptsIds[recipeStructure.RecipeId] && p.ComponentId == newComponentsIds[recipeStructure.ComponentId]))
     {
         var recipeStr = new TTSTest.TemplateDB.RecipeStructure()
         {
@@ -155,8 +184,8 @@ foreach (var timeSet in twoContext.TimeSets)
 {
     //ищем время в главной БД
     //признак уникальности - наименование, время смешивания бетона в секундах  
-    var oldMixer = templateContext.RecipeTimeSets.Where(p => p.Name == timeSet.Name && p.MixTime == timeSet.MixTime).FirstOrDefault();
-    if (oldMixer == null)
+    var oldTimeSet = templateContext.RecipeTimeSets.Where(p => p.Name == timeSet.Name && p.MixTime == timeSet.MixTime).FirstOrDefault();
+    if (oldTimeSet == null)
     {
         var time = new TTSTest.TemplateDB.RecipeTimeSet()
         {
@@ -170,7 +199,7 @@ foreach (var timeSet in twoContext.TimeSets)
     }
     else
     {
-        newTimeSetsIds.Add(oldMixer.Id, oldMixer.Id);
+        newTimeSetsIds.Add(oldTimeSet.Id, oldTimeSet.Id);
         log.AppendLine($"DB2\tTimeSet {timeSet.Name} пропущен");
     }
 }
@@ -198,3 +227,17 @@ foreach (var recipe in twoContext.Recipes)
         log.AppendLine($"DB2\tРецепт {recipe.Name} пропущен");
     }
 }
+
+string path = "changes.txt";
+using (StreamWriter writer = new StreamWriter(path, false))
+{
+    writer.WriteLine("Результаты переноса данных");
+    writer.WriteLine(log);
+}
+ProcessStartInfo startInfo = new ProcessStartInfo
+{
+    FileName = path,
+    UseShellExecute = true
+};
+
+Process.Start(startInfo);
