@@ -15,7 +15,9 @@ var twoContext = new Db2Context();
 templateContext.Database.EnsureCreated();
 oneDbContext.Database.EnsureCreated();
 twoContext.Database.EnsureCreated();
+
 var log = new StringBuilder();
+var day = oneDbContext.ComponentTypes.ToList();
 //переносим типы компонентов в главную БД
 foreach (var type in oneDbContext.ComponentTypes)
 {

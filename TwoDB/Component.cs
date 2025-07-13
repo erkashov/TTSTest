@@ -11,5 +11,7 @@ public partial class Component
 
     public int TypeId { get; set; }
 
+    public double Humidity { get; set; }
+
     public virtual ComponentType Type { get; set; } = null!;
 }
